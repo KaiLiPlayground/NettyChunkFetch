@@ -1,3 +1,5 @@
+package com.nettychunkfetch.client;
+
 import com.nettychunkfetch.client.NettyClient;
 
 import java.util.Random;

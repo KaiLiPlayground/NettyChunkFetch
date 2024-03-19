@@ -1,3 +1,5 @@
+package com.nettychunkfetch.server;
+
 import com.nettychunkfetch.server.NettyServer;
 
 public class ServerTest {
