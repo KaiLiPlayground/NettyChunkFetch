@@ -1,0 +1,15 @@
+com\nettychunkfetch\client\ClientHandler.class
+com\nettychunkfetch\client\NettyClient.class
+com\nettychunkfetch\client\NettyClient$1.class
+LogbackTest.class
+com\nettychunkfetch\codec\MessageDecoder.class
+com\nettychunkfetch\ApplicationTest.class
+com\nettychunkfetch\server\NettyServer$1.class
+com\nettychunkfetch\codec\MessageEncoder.class
+ClientTest.class
+com\nettychunkfetch\server\ServerHandler.class
+ServerTest.class
+com\nettychunkfetch\messages\ChunkFetchResponse.class
+com\nettychunkfetch\server\NettyServer.class
+com\nettychunkfetch\codec\SerializationUtils.class
+com\nettychunkfetch\messages\ChunkFetchRequest.class
