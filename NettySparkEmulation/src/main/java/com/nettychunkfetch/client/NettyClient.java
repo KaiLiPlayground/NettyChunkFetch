@@ -10,6 +10,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import com.nettychunkfetch.codec.MessageDecoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 
 public class NettyClient {
     private final String host;
@@ -29,6 +31,7 @@ public class NettyClient {
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) {
+                            ch.pipeline().addLast("logger", new LoggingHandler(LogLevel.INFO));
                             ch.pipeline().addLast(new MessageDecoder(), new MessageEncoder(), new ClientHandler());
                         }
                     });

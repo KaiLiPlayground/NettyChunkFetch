@@ -13,5 +13,4 @@
     <!-- Enable DEBUG logging specifically for Netty -->
     <logger name="io.netty" level="DEBUG" />
 
-    <logger name="com.nettychunkfetch" level="DEBUG" />
 </configuration>

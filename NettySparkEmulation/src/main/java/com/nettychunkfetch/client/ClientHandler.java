@@ -10,23 +10,23 @@ public class ClientHandler extends SimpleChannelInboundHandler<ChunkFetchRespons
     private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ChunkFetchResponse msg) {
-        //System.out.println("Client received data for chunk: " + msg.getChunkId());
-        //System.out.println("Data: " + new String(msg.getData()));
-        logger.debug("Client received data for chunk: {}", msg.getChunkId());
-        logger.debug("Data: ", new String(msg.getData()));
+        System.out.println("Client received data for chunk: " + msg.getChunkId());
+        System.out.println("Data: " + new String(msg.getData()));
+        //logger.debug("Client received data for chunk: {}", msg.getChunkId());
+        //logger.debug("Data: ", new String(msg.getData()));
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         super.channelActive(ctx);
-        // System.out.println("Client: Channel is active");
-        logger.debug("Client: Channel is active");
+        System.out.println("Client: Channel is active");
+        // logger.debug("Client: Channel is active");
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cause.printStackTrace();
-        logger.error("Client channel exception", cause);
+        // logger.error("Client channel exception", cause);
         ctx.close();
     }
 }
