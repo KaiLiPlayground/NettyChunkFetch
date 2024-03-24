@@ -1,0 +1,158 @@
+
+Netty in Spark: Role and Functionalities
+
+Core Networking: org.apache.spark.network leverages Netty for efficient connection management and data transport.
+RPC Framework: org.apache.spark.rpc uses Netty to facilitate fast and reliable RPC operations within Spark's distributed environment.
+Netty Implementations: Both org.apache.spark.network.netty & org.apache.spark.rpc.netty provide Netty-based optimizations, ensuring high-performance network communication and RPC handling.
+Unified Communication: Netty underpins Spark's network layer, enabling scalable and robust data exchange across cluster nodes, crucial for distributed computing tasks.
+
+org.apache.spark.network: Manages connection and data transport.
+org.apache.spark.rpc: Supports RPC operations.
+org.apache.spark.network.netty, org.apache.spark.rpc.netty: Netty-based implementations.
+
+
+115 class files 
+spark_repo\spark-3.4\core\src\main\scala\org\apache\spark\network\netty
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          3/4/2023   3:31 PM           8558 NettyBlockRpcServer.scala
+-a----          3/4/2023   3:31 PM           8907 NettyBlockTransferService.scala
+-a----          3/4/2023   3:31 PM           3096 SparkTransportConf.scala
+spark_repo\spark-3.4\core\src\main\scala\org\apache\spark\rpc
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----          3/4/2023   3:31 PM                netty
+-a----          3/4/2023   3:31 PM           1793 RpcAddress.scala
+-a----          3/4/2023   3:31 PM           1340 RpcCallContext.scala
+-a----          3/4/2023   3:31 PM           5705 RpcEndpoint.scala
+-a----          3/4/2023   3:31 PM           2633 RpcEndpointAddress.scala
+-a----          3/4/2023   3:31 PM            988 RpcEndpointNotFoundException.scala
+-a----          3/4/2023   3:31 PM           4203 RpcEndpointRef.scala
+-a----          3/4/2023   3:31 PM           7073 RpcEnv.scala
+-a----          3/4/2023   3:31 PM            934 RpcEnvStoppedException.scala
+-a----          3/4/2023   3:31 PM           5495 RpcTimeout.scala
+spark-3.4\core\src\main\scala\org\apache\spark\rpc\netty
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          3/4/2023   3:31 PM           7864 Dispatcher.scala
+-a----          3/4/2023   3:31 PM           7924 Inbox.scala
+-a----          3/4/2023   3:31 PM           6209 MessageLoop.scala
+-a----          3/4/2023   3:31 PM           2113 NettyRpcCallContext.scala
+-a----          3/4/2023   3:31 PM          27660 NettyRpcEnv.scala
+-a----          3/4/2023   3:31 PM           3868 NettyStreamManager.scala
+-a----          3/4/2023   3:31 PM           7859 Outbox.scala
+-a----          3/4/2023   3:31 PM           1581 RpcEndpointVerifier.scala
+SPARK-3.4\COMMON\NETWORK-COMMON\SRC\MAIN\JAVA\ORG\APACHE\SPARK\NETWORK
+│   TransportContext.java
+│
+├───buffer
+│       FileSegmentManagedBuffer.java
+│       ManagedBuffer.java
+│       NettyManagedBuffer.java
+│       NioManagedBuffer.java
+│
+├───client
+│       BaseResponseCallback.java
+│       ChunkFetchFailureException.java
+│       ChunkReceivedCallback.java
+│       MergedBlockMetaResponseCallback.java
+│       RpcResponseCallback.java
+│       StreamCallback.java
+│       StreamCallbackWithID.java
+│       StreamInterceptor.java
+│       TransportClient.java
+│       TransportClientBootstrap.java
+│       TransportClientFactory.java
+│       TransportResponseHandler.java
+│
+├───crypto
+│       AuthClientBootstrap.java
+│       AuthEngine.java
+│       AuthMessage.java
+│       AuthRpcHandler.java
+│       AuthServerBootstrap.java
+│       README.md
+│       TransportCipher.java
+│
+├───protocol
+│       AbstractMessage.java
+│       AbstractResponseMessage.java
+│       ChunkFetchFailure.java
+│       ChunkFetchRequest.java
+│       ChunkFetchSuccess.java
+│       Encodable.java
+│       Encoders.java
+│       MergedBlockMetaRequest.java
+│       MergedBlockMetaSuccess.java
+│       Message.java
+│       MessageDecoder.java
+│       MessageEncoder.java
+│       MessageWithHeader.java
+│       OneWayMessage.java
+│       RequestMessage.java
+│       ResponseMessage.java
+│       RpcFailure.java
+│       RpcRequest.java
+│       RpcResponse.java
+│       StreamChunkId.java
+│       StreamFailure.java
+│       StreamRequest.java
+│       StreamResponse.java
+│       UploadStream.java
+│
+├───sasl
+│       SaslClientBootstrap.java
+│       SaslEncryption.java
+│       SaslEncryptionBackend.java
+│       SaslMessage.java
+│       SaslRpcHandler.java
+│       SaslServerBootstrap.java
+│       SaslTimeoutException.java
+│       SecretKeyHolder.java
+│       SparkSaslClient.java
+│       SparkSaslServer.java
+│
+├───server
+│       AbstractAuthRpcHandler.java
+│       BlockPushNonFatalFailure.java
+│       ChunkFetchRequestHandler.java
+│       MessageHandler.java
+│       NoOpRpcHandler.java
+│       OneForOneStreamManager.java
+│       RpcHandler.java
+│       StreamManager.java
+│       TransportChannelHandler.java
+│       TransportRequestHandler.java
+│       TransportServer.java
+│       TransportServerBootstrap.java
+│
+├───shuffledb
+│       DB.java
+│       DBBackend.java
+│       DBIterator.java
+│       LevelDB.java
+│       LevelDBIterator.java
+│       RocksDB.java
+│       RocksDBIterator.java
+│       StoreVersion.java
+│
+└───util
+        AbstractFileRegion.java
+        ByteArrayReadableChannel.java
+        ByteArrayWritableChannel.java
+        ByteUnit.java
+        ConfigProvider.java
+        CryptoUtils.java
+        DBProvider.java
+        IOMode.java
+        JavaUtils.java
+        LevelDBProvider.java
+        LimitedInputStream.java
+        MapConfigProvider.java
+        NettyLogger.java
+        NettyMemoryMetrics.java
+        NettyUtils.java
+        RocksDBProvider.java
+        TimerWithCustomTimeUnit.java
+        TransportConf.java
+        TransportFrameDecoder.java

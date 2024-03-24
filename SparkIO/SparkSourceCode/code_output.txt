@@ -1,0 +1,608 @@
+file titled: ApplicationTest.java
+=======================begin of file content
+package com.nettychunkfetch;
+
+import com.nettychunkfetch.client.NettyClient;
+import com.nettychunkfetch.server.NettyServer;
+
+import java.util.Random;
+
+public class ApplicationTest {
+    public static void main(String[] args) throws Exception {
+        int port = 8080;
+        new Thread(() -> {
+            try {
+                new NettyServer(port).start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        Thread.sleep(1000); // Wait for the server to start
+
+        NettyClient client = new NettyClient("localhost", port);
+        Random ran = new Random(500);
+
+        while (true)
+        {
+            client.sendFetchRequest("chunk" + ran.nextInt(10));
+        }
+
+    }
+}
+=======================end of file content
+
+file titled: ClientHandler.java
+=======================begin of file content
+package com.nettychunkfetch.client;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import com.nettychunkfetch.messages.ChunkFetchResponse;
+
+public class ClientHandler extends SimpleChannelInboundHandler<ChunkFetchResponse> {
+    private static final Logger logger = LoggerFactory.getLogger(ClientHandler.class);
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, ChunkFetchResponse msg) {
+        System.out.println("Client received data for chunk: " + msg.getChunkId());
+        System.out.println("Data: " + new String(msg.getData()));
+        //logger.debug("Client received data for chunk: {}", msg.getChunkId());
+        //logger.debug("Data: ", new String(msg.getData()));
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        super.channelActive(ctx);
+        System.out.println("Client: Channel is active");
+        // logger.debug("Client: Channel is active");
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cause.printStackTrace();
+        // logger.error("Client channel exception", cause);
+        ctx.close();
+    }
+}
+=======================end of file content
+
+file titled: NettyClient.java
+=======================begin of file content
+package com.nettychunkfetch.client;
+
+import com.nettychunkfetch.codec.MessageEncoder;
+import com.nettychunkfetch.messages.ChunkFetchRequest;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import com.nettychunkfetch.codec.MessageDecoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+
+import java.util.Random;
+
+public class NettyClient {
+    private final String host;
+    private final int port;
+
+    public NettyClient(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+
+    public void sendFetchRequest(String chunkId) throws Exception {
+        EventLoopGroup group = new NioEventLoopGroup();
+        try {
+            Bootstrap b = new Bootstrap();
+            b.group(group)
+                    .channel(NioSocketChannel.class)
+                    .handler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        public void initChannel(SocketChannel ch) {
+                            ch.pipeline().addLast("logger", new LoggingHandler(LogLevel.INFO));
+                            ch.pipeline().addLast(new MessageDecoder(), new MessageEncoder(), new ClientHandler());
+                        }
+                    });
+
+            Channel channel = b.connect(host, port).sync().channel();
+
+            //ChunkFetchRequest request = new ChunkFetchRequest(chunkId);
+            //channel.writeAndFlush(request);
+            Random ran = new Random();
+            int chunk_cnt = 1000;
+            while (chunk_cnt-- >= 0)
+            {
+                ChunkFetchRequest request = new ChunkFetchRequest("Chunk" + ran.nextInt(1000));
+                channel.writeAndFlush(request);
+                Thread.sleep(1000); // Wait for 1 second
+            }
+
+            channel.closeFuture().sync();
+
+        } finally {
+            group.shutdownGracefully();
+        }
+    }
+}
+=======================end of file content
+
+file titled: CatchAllHandler.java
+=======================begin of file content
+package com.nettychunkfetch.codec;
+
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+
+public class CatchAllHandler extends ChannelInboundHandlerAdapter {
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        System.out.println("CatchAllHandler received message: " + msg);
+    }
+}
+=======================end of file content
+
+file titled: MessageDecoder.java
+=======================begin of file content
+package com.nettychunkfetch.codec;
+
+import com.nettychunkfetch.messages.ChunkFetchRequest;
+import com.nettychunkfetch.messages.ChunkFetchResponse;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.ByteToMessageDecoder;
+import java.util.List;
+
+public class MessageDecoder extends ByteToMessageDecoder {
+    @Override
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        if (in.readableBytes() < 5) { // Byte for type + int for length
+            return;
+        }
+
+        in.markReaderIndex();
+        byte messageTypeByte = in.readByte();
+        MessageType messageType = MessageType.fromInt(messageTypeByte);
+        int length = in.readInt();
+
+        if (in.readableBytes() < length) {
+            in.resetReaderIndex();
+            return;
+        }
+
+        ByteBuf data = in.readSlice(length); // Use readSlice to avoid modifying reader index further
+        switch (messageType) {
+            case REQUEST:
+                // Assuming you have a similar fromByteBuf method for ChunkFetchRequest
+                out.add(ChunkFetchRequest.fromByteBuf(data));
+                break;
+            case RESPONSE:
+                out.add(ChunkFetchResponse.fromByteBuf(data));
+                break;
+            default:
+                throw new IllegalStateException("Unknown message type: " + messageType);
+        }
+    }
+}
+=======================end of file content
+
+file titled: MessageEncoder.java
+=======================begin of file content
+package com.nettychunkfetch.codec;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.MessageToByteEncoder;
+import com.nettychunkfetch.messages.ChunkFetchRequest;
+import com.nettychunkfetch.messages.ChunkFetchResponse;
+
+public class MessageEncoder extends MessageToByteEncoder<Object> {
+    @Override
+    protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf out) throws Exception {
+        if (msg instanceof ChunkFetchRequest) {
+            out.writeByte(MessageType.REQUEST.getValue()); // Prefix with message type
+            ByteBuf data = ((ChunkFetchRequest) msg).toByteBuf();
+            out.writeInt(data.readableBytes());
+            out.writeBytes(data);
+        } else if (msg instanceof ChunkFetchResponse) {
+            out.writeByte(MessageType.RESPONSE.getValue()); // Prefix with message type
+            ByteBuf data = ((ChunkFetchResponse) msg).toByteBuf();
+            out.writeInt(data.readableBytes());
+            out.writeBytes(data);
+        }
+    }
+
+}
+=======================end of file content
+
+file titled: MessageType.java
+=======================begin of file content
+package com.nettychunkfetch.codec;
+
+public enum MessageType {
+    REQUEST(1),
+    RESPONSE(2);
+
+    private final int value;
+
+    MessageType(int value) {
+        this.value = value;
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    // You can add a method to get enum from int value if necessary
+    public static MessageType fromInt(int i) {
+        for (MessageType type : MessageType.values()) {
+            if (type.getValue() == i) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Invalid message type value: " + i);
+    }
+}
+
+=======================end of file content
+
+file titled: ChunkFetchRequest.java
+=======================begin of file content
+package com.nettychunkfetch.messages;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
+public class ChunkFetchRequest {
+    private final String chunkId;
+
+    public ChunkFetchRequest(String chunkId) {
+        this.chunkId = chunkId;
+    }
+
+    public String getChunkId() {
+        return chunkId;
+    }
+
+    // Serialize
+    public ByteBuf toByteBuf() {
+        return Unpooled.wrappedBuffer(this.chunkId.getBytes());
+    }
+
+    // Deserialize
+    public static ChunkFetchRequest fromByteBuf(ByteBuf byteBuf) {
+        byte[] bytes = new byte[byteBuf.readableBytes()];
+        byteBuf.readBytes(bytes);
+        return new ChunkFetchRequest(new String(bytes));
+    }
+}=======================end of file content
+
+file titled: ChunkFetchResponse.java
+=======================begin of file content
+package com.nettychunkfetch.messages;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
+public class ChunkFetchResponse {
+    private final String chunkId;
+    private final byte[] data;
+
+    public ChunkFetchResponse(String chunkId, byte[] data) {
+        this.chunkId = chunkId;
+        this.data = data;
+    }
+
+    public String getChunkId() {
+        return chunkId;
+    }
+
+    public byte[] getData() {
+        return data;
+    }
+
+    // Serialize
+    public ByteBuf toByteBuf() {
+        ByteBuf encoded = Unpooled.buffer();
+        byte[] chunkIdBytes = this.chunkId.getBytes();
+        encoded.writeInt(chunkIdBytes.length);
+        encoded.writeBytes(chunkIdBytes);
+        encoded.writeInt(data.length);
+        encoded.writeBytes(data);
+        return encoded;
+    }
+
+    // Deserialize
+    public static ChunkFetchResponse fromByteBuf(ByteBuf byteBuf) {
+        int chunkIdLength = byteBuf.readInt();
+        byte[] chunkIdBytes = new byte[chunkIdLength];
+        byteBuf.readBytes(chunkIdBytes);
+        String chunkId = new String(chunkIdBytes);
+
+        int dataLength = byteBuf.readInt();
+        byte[] data = new byte[dataLength];
+        byteBuf.readBytes(data);
+
+        return new ChunkFetchResponse(chunkId, data);
+    }
+}=======================end of file content
+
+file titled: NettyServer.java
+=======================begin of file content
+package com.nettychunkfetch.server;
+
+import com.nettychunkfetch.codec.CatchAllHandler;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import com.nettychunkfetch.codec.MessageDecoder;
+import com.nettychunkfetch.codec.MessageEncoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+
+public class NettyServer {
+    private final int port;
+
+    public NettyServer(int port) {
+        this.port = port;
+    }
+
+    public void start() throws Exception {
+        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        try {
+            ServerBootstrap b = new ServerBootstrap();
+            b.group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        public void initChannel(SocketChannel ch) {
+                            ch.pipeline().addLast("logger", new LoggingHandler(LogLevel.INFO));
+                            ch.pipeline().addLast(new MessageDecoder(), new MessageEncoder(), new ServerHandler());
+                            ch.pipeline().addLast("catch all handler", new CatchAllHandler());
+                        }
+                    });
+           ChannelFuture f = b.bind(port).sync();
+           f.channel().closeFuture().sync();
+        } finally {
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
+        }
+    }
+}
+=======================end of file content
+
+file titled: ServerHandler.java
+=======================begin of file content
+package com.nettychunkfetch.server;
+
+import com.nettychunkfetch.messages.ChunkFetchRequest;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import com.nettychunkfetch.messages.ChunkFetchResponse;
+
+public class ServerHandler extends SimpleChannelInboundHandler<ChunkFetchRequest> {
+    private static final Logger logger = LoggerFactory.getLogger(ServerHandler.class);
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, ChunkFetchRequest msg) {
+        System.out.println("Server received fetch request for chunk: " + msg.getChunkId());
+        //logger.debug("Server received fetch request for chunk: {}", msg.getChunkId());
+
+        // Simulate fetching data. In a real application, fetch data from storage.
+        byte[] data = ("data for chunk " + msg.getChunkId()).getBytes();
+        ChunkFetchResponse response = new ChunkFetchResponse(msg.getChunkId(), data);
+        ctx.writeAndFlush(response);
+        //ctx.writeAndFlush(new ChunkFetchResponse("test", "response".getBytes()));
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        super.channelActive(ctx);
+        System.out.println("Server: Channel is active");
+        //logger.debug("Server: Channel is active");
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        cause.printStackTrace();
+        //logger.error("Server channel exception", cause);
+        ctx.close();
+    }
+}=======================end of file content
+
+file titled: App.java
+=======================begin of file content
+package $org.example;
+
+/**
+ * Hello world!
+ *
+ */
+public class App 
+{
+    public static void main( String[] args )
+    {
+        System.out.println( "Hello World!" );
+    }
+}
+=======================end of file content
+
+file titled: AppTest.java
+=======================begin of file content
+package $org.example;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+
+/**
+ * Unit test for simple App.
+ */
+public class AppTest 
+    extends TestCase
+{
+    /**
+     * Create the test case
+     *
+     * @param testName name of the test case
+     */
+    public AppTest( String testName )
+    {
+        super( testName );
+    }
+
+    /**
+     * @return the suite of tests being tested
+     */
+    public static Test suite()
+    {
+        return new TestSuite( AppTest.class );
+    }
+
+    /**
+     * Rigourous Test :-)
+     */
+    public void testApp()
+    {
+        assertTrue( true );
+    }
+}
+=======================end of file content
+
+file titled: LogbackTest.java
+=======================begin of file content
+package com.nettychunkfetch;
+
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.joran.JoranConfigurator;
+import ch.qos.logback.core.util.StatusPrinter;
+import org.slf4j.LoggerFactory;
+
+public class LogbackTest {
+    public static void main(String[] args) {
+        LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+
+        try {
+            JoranConfigurator configurator = new JoranConfigurator();
+            configurator.setContext(context);
+            // Assuming logback.xml is directly under src/main/resources
+            configurator.doConfigure(LogbackTest.class.getResourceAsStream("/logback.xml"));
+        } catch (Exception e) {
+            System.err.println("Error configuring Logback: " + e.getMessage());
+        }
+
+        StatusPrinter.printInCaseOfErrorsOrWarnings(context);
+
+        // Add your logging test here
+        LoggerFactory.getLogger(LogbackTest.class).debug("This is a test debug message");
+    }
+}
+=======================end of file content
+
+file titled: ClientTest.java
+=======================begin of file content
+package com.nettychunkfetch.client;
+
+import com.nettychunkfetch.client.NettyClient;
+
+import java.util.Random;
+
+public class ClientTest {
+    public static void main(String[] args) throws Exception {
+        NettyClient client = new NettyClient("localhost", 8081);
+        Random ran = new Random();
+        while (true)
+        {
+            client.sendFetchRequest("chunk" + ran.nextInt(100)); // Send a request for "chunk1"
+        }
+        //client.sendFetchRequest("chunk10");
+    }
+}
+=======================end of file content
+
+file titled: ServerTest.java
+=======================begin of file content
+package com.nettychunkfetch.server;
+
+import com.nettychunkfetch.server.NettyServer;
+
+public class ServerTest {
+    public static void main(String[] args) throws Exception {
+        NettyServer server = new NettyServer(8081);
+        server.start(); // Start the server on port 8080
+    }
+}
+=======================end of file content
+
+file titled: App.java
+=======================begin of file content
+package $org.example;
+
+/**
+ * Hello world!
+ *
+ */
+public class App 
+{
+    public static void main( String[] args )
+    {
+        System.out.println( "Hello World!" );
+    }
+}
+=======================end of file content
+
+file titled: AppTest.java
+=======================begin of file content
+package $org.example;
+
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+
+/**
+ * Unit test for simple App.
+ */
+public class AppTest 
+    extends TestCase
+{
+    /**
+     * Create the test case
+     *
+     * @param testName name of the test case
+     */
+    public AppTest( String testName )
+    {
+        super( testName );
+    }
+
+    /**
+     * @return the suite of tests being tested
+     */
+    public static Test suite()
+    {
+        return new TestSuite( AppTest.class );
+    }
+
+    /**
+     * Rigourous Test :-)
+     */
+    public void testApp()
+    {
+        assertTrue( true );
+    }
+}
+=======================end of file content
+
