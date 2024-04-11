@@ -257,3 +257,87 @@ This PlantUML diagram visualizes the structure and communication pathways of a d
 - **Internet or External Network**: Indicates the broader internet or other external networks that VMs can access through their public NICs. This connection is used for downloading dependencies, accessing external data sources, or interacting with cloud services outside the Azure virtual network.
 
 This diagram succinctly captures the complex interactions within a distributed Spark application, focusing on the networking aspects that underpin reliable and secure data processing in a cloud environment.
+
+
+
+# I know Transport{Server/Client} will go through layer 4 (TransportLayer). What would be the example of usage on Layer 7 and Layer 6 (possibly when SSL enabled?)
+
+For Layer 7 (Application Layer) and Layer 6 (Session Layer) within the context of Spark's networking, especially when SSL/TLS is enabled, the usage examples become more nuanced, as these layers handle higher-level operations:
+
+### Layer 7 (Application Layer):
+
+- **HTTP for API Calls**: Spark's web UI and REST API, for instance, use HTTP(S) protocols for communication. This is where commands to monitor or control Spark jobs are issued and received at the application level.
+- **Data Serialization/Deserialization**: When Spark sends or receives data, it serializes or deserializes this data (e.g., converting Java objects to JSON for REST API responses). This processing happens at the application layer.
+- **Encrypted Data Transmission (with SSL/TLS)**: When SSL/TLS is enabled, the application layer (using Netty's SSL handlers, for example) initiates encryption of data before it's sent over the network, ensuring secure data transmission.
+
+### Layer 6 (Session Layer):
+
+- **Session Management for Secure Connections**: With SSL/TLS, a session is established that defines a secure communication channel. The session layer's role here is abstracted in JVM and handled by libraries (like Netty's SslHandler), which manage session initiation, negotiation of encryption parameters, and session resumption for repeated secure communications.
+- **Authentication and Authorization**: In secure Spark environments, establishing a session might involve authentication (verifying the identity of the communicating parties) and authorization (ensuring they have permission to perform requested operations), particularly when integrated with secure data sources or services.
+
+### Practical Considerations:
+
+- While the OSI model neatly categorizes network functions into layers, real-world applications often blend these responsibilities. For example, Netty, as used by Spark, abstracts many lower-level networking functions but also provides utilities that work at higher levels (like SSL encryption and HTTP codecs).
+- In Spark's case, Layer 6 functionalities are typically not explicitly managed by Spark developers but are handled by underlying networking libraries (like Java's SSLContext for SSL sessions) and the JVM.
+- The introduction of SSL/TLS adds complexity to the network stack, impacting Layers 4 through 7, from establishing secure TCP connections to encrypting application-level data. Spark and Netty simplify these tasks for developers, abstracting much of the complexity behind configuration options and APIs.
+
+Understanding these layers and their roles can help diagnose and troubleshoot network-related issues in distributed Spark applications, especially in secured environments where SSL/TLS is in play.
+
+
+
+
+In the context of running a Spark application on an HDInsight (Hortonworks-based) cluster, the API calls you might be interested in are those related to job submission, monitoring, and management. HDInsight provides access to various services including Apache Ambari, which can be used for managing and monitoring the cluster. Here are examples of the types of API calls you might use:
+
+1. **Job Submission**: To submit a Spark job, you might use the Livy REST API, which is a service for submitting Spark jobs from anywhere to a Spark cluster. An example API call to submit a job might look like:
+   
+   ```
+   POST /batches
+   {
+     "file": "wasb:///example/jars/spark-example.jar",
+     "className": "org.apache.spark.examples.SparkPi"
+   }
+   ```
+   
+   This call submits a Spark job to calculate Pi using the `SparkPi` example class.
+
+2. **Checking Job Status**: After submitting a job, you can check its status using the Livy REST API:
+   
+   ```
+   GET /batches/{batchId}
+   ```
+   
+   This call retrieves the status of the job with the specified `batchId`.
+
+3. **Listing Spark Applications**: To list all Spark applications running on the cluster, you can use the Ambari REST API:
+   
+   ```
+   GET /api/v1/clusters/{clusterName}/services/SPARK/components/SPARK_JOBHISTORYSERVER
+   ```
+   
+   This call lists the Spark applications managed by the JobHistoryServer component in the specified cluster.
+
+4. **Retrieving Application Logs**: To access the logs of a specific Spark application, you might use the YARN ResourceManager's REST API:
+   
+   ```
+   GET /ws/v1/cluster/apps/{appId}/logs
+   ```
+   
+   This call fetches the logs for the application identified by `appId`.
+
+5. **Cluster Management**: To manage the cluster itself, such as starting or stopping services, you can use the Ambari REST API. For example, to stop the Spark2 service:
+   
+   ```
+   PUT /api/v1/clusters/{clusterName}/services/SPARK2
+   {
+     "RequestInfo": {
+       "context": "Stop Spark2 Service"
+     },
+     "ServiceInfo": {
+       "state": "INSTALLED"
+     }
+   }
+   ```
+   
+   This call requests to stop the Spark2 service on the specified cluster.
+
+These API calls provide a programmable interface to manage Spark applications and the HDInsight cluster itself. It's important to replace placeholders like `{batchId}`, `{clusterName}`, and `{appId}` with actual values relevant to your cluster and applications.

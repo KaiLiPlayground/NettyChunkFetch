@@ -96,7 +96,7 @@ Validating the PlantUML diagram and the components involved in the shuffle proce
 
 Given this detailed understanding, the initial PlantUML diagram's portrayal is largely accurate with some clarifications:
 
-- **Executors**: The diagram should clearly depict executors handling both the shuffle write phase (pre-aggregation and writing shuffle files) and shuffle read phase (reading shuffle blocks and final aggregation). Components like `BlockManager` and `HashAggregateExec` are crucial here.
+- **Executors**: The diagram should clearly depict **executors handling both the shuffle write phase (pre-aggregation and writing shuffle files) and shuffle read phase (reading shuffle blocks and final aggregation)** . Components like `BlockManager` and `HashAggregateExec` are crucial here.
 
 - **Driver**: The diagram must emphasize the driver's role in planning and coordinating the shuffle operation, including the creation of `Exchange` nodes in the physical plan and possibly overseeing the `ShuffleManager` for shuffle planning. The driver's role in monitoring and potentially adjusting the execution plan through AQE should also be represented.
 
@@ -183,3 +183,38 @@ In this PlantUML diagram, we have a simplified view focusing on the core compone
 - The interactions between the driver and executors include not only coordination of the shuffle process but also the aggregation of final results once the shuffle and subsequent computations are complete.
 
 This PlantUML diagram visually represents the architecture and interactions involved in managing and executing a shuffle operation within a Spark application, emphasizing the role of the Driver BlockManager in coordinating these activities and the Executor BlockManagers in executing the data exchange.
+
+
+
+# Clarification on Shuffle Read and Shuffle Write
+
+Let's clarify the shuffle process in Spark, particularly focusing on your questions related to the shuffle write and read phases:
+
+### ASK1: Shuffle Write Phase
+
+During the shuffle write phase, executors perform local pre-aggregation tasks. This pre-aggregation is part of optimizing the shuffle operation by reducing the amount of data that needs to be shuffled across the network. The specific storage location of this pre-aggregated data can vary based on the Spark configuration:
+
+- **Local BlockManager Storage**: By default, the pre-aggregated shuffle data is stored locally on the executor's disk and managed by the executor's `BlockManager`. The `BlockManager` is responsible for storing and managing data blocks both in memory and on disk.
+
+- **External Shuffle Service**: Spark can be configured to use an external shuffle service. When enabled, the shuffle data is stored outside of the executors in a dedicated service. This allows for the shuffle data to be retained even if the executor crashes, providing fault tolerance for long-running applications.
+
+### ASK2: Shuffle Read Phase
+
+For the shuffle read phase:
+
+- **Data Fetching**: Executors fetch shuffle data from other executors or from the external shuffle service, depending on the configuration. This fetching is done based on shuffle blocks, which contain data partitioned by the key. Executors request specific shuffle blocks that contain the data they need for further processing.
+
+- **Location of Shuffle Data**: The location from which an executor reads shuffle data can be:
+  
+  - Directly from the local or remote executors' storage (disk or memory), managed by the `BlockManager`.
+  - From an external shuffle service if configured, which centralizes the management of shuffle data.
+
+- **Final Aggregation**: After all the required shuffle blocks are fetched, each executor performs the final aggregation locally. This aggregation combines the fetched shuffle data with local data (if any) to produce the final result for its set of keys.
+
+### Summary
+
+- The **shuffle write phase** involves local pre-aggregation and storage of shuffle data either locally or in an external shuffle service, depending on the Spark configuration.
+- During the **shuffle read phase**, executors fetch required shuffle blocks either from other executors or the external shuffle service. After fetching, executors perform the final aggregation locally.
+- The Spark's **`RpcEnv`** primarily facilitates control messages and task execution commands between the driver and executors. The actual shuffle data transfer does not use `RpcEnv` but relies on the `BlockManager` for data management and Netty for network communication.
+
+The shuffle process is a crucial part of Spark's distributed data processing capabilities, allowing for efficient data redistribution among executors for tasks like grouping and aggregation.
